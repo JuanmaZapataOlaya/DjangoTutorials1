@@ -1,6 +1,9 @@
 from django.shortcuts import render # here by default 
 from django.views.generic import TemplateView 
 from django.views import View
+from django.http import HttpResponseRedirect  # Agrega esta importación
+from django import forms 
+from django.shortcuts import redirect 
 
 
 class HomePageView(TemplateView):
@@ -46,12 +49,47 @@ class ProductIndexView(View):
 class ProductShowView(View): 
     template_name = 'products/show.html' 
  
- 
     def get(self, request, id): 
+        # Validar si el id es un número válido y existe el producto
+        try:
+            idx = int(id) - 1
+            if idx < 0 or idx >= len(Product.products):
+                return HttpResponseRedirect('/')  # Redirige a home si no es válido
+            product = Product.products[idx]
+        except (ValueError, IndexError):
+            return HttpResponseRedirect('/')  # Redirige a home si hay error
+
         viewData = {} 
-        product = Product.products[int(id)-1] 
         viewData["title"] = product["name"] + " - Online Store" 
         viewData["subtitle"] =  product["name"] + " - Product information" 
         viewData["product"] = product 
  
         return render(request, self.template_name, viewData)
+
+    name = forms.CharField(required=True) 
+    price = forms.FloatField(required=True) 
+ 
+ 
+class ProductForm(forms.Form): 
+    name = forms.CharField(required=True) 
+    price = forms.FloatField(required=True) 
+
+    def clean_price(self):
+        price = self.cleaned_data.get('price')
+        if price is not None and price <= 0:
+            raise forms.ValidationError("The price must be greater than zero.")
+        return price
+ 
+class ProductCreateView(View): 
+    template_name = 'products/create.html' 
+ 
+    def get(self, request): 
+        form = ProductForm()
+        return render(request, self.template_name, {"title": "Create product", "form": form})
+ 
+    def post(self, request):
+        form = ProductForm(request.POST)
+        if form.is_valid():
+            return render(request, 'products/created.html', {"title": "Product created"})
+        # Si el formulario no es válido, vuelve a mostrar el formulario con errores
+        return render(request, self.template_name, {"title": "Create product", "form": form})
